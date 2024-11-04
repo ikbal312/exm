@@ -1,0 +1,26 @@
+worker_processes auto;  # Adjust based on your CPU cores
+
+events {
+    worker_connections 1024;  # Maximum number of connections per worker
+}
+
+http {
+    upstream app {
+        %{ for addrs in AppServers ~}
+        server ${addrs}:${Port}; 
+        %{ endfor ~}
+    }
+
+    server {
+        listen 80;  # Listen on port 80
+
+        location / {
+            proxy_pass http://app;
+        }
+
+        error_page 500 502 503 504 /50x.html;
+        location = /50x.html {
+            root /usr/share/nginx/html;  # Adjust path if needed
+        }
+    }
+}
