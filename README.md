@@ -178,7 +178,7 @@ output "cluster_agent_ips" {
 
 ### code
     
-```terrform
+```terraform
 # variables for k3s cluster module
 
 
