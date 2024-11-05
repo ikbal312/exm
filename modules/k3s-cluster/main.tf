@@ -20,11 +20,7 @@ resource "aws_security_group" "k3s" {
     protocol    = "udp"
     cidr_blocks = [var.ingress_cluster_cidr]
   }
-  ingress {
-    from_port = 0
-    to_port   = 0
-    protocol  = "-1"
-  }
+
   ingress {
     from_port   = 22
     to_port     = 22
