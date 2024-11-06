@@ -212,7 +212,7 @@ locals {
 
 ### k3s cluster module
  setup cluster using "k3s-cluster" module.
- change k3s token deployment.
+ change k3s token in deployment.
 ```terraform
 variable "k3s_token" {
   type    = string
