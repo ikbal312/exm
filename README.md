@@ -16,13 +16,124 @@ we are going to make two module one for "k3s cluster" another for "nginx load ba
 
 
 ## infra code
-``` terraform 
-# variables 
-variable "k3s_token" {
-  type    = string
-  default = "e2d2fe05faac243a166d617e9a450ad0"   # demo token ****** change in production ****
-}
+### keypair 
+  this key pair will be use for all instances.
+
+```terraform
+resource "aws_key_pair" "kp" {
+  key_name   = "kp"
+  public_key = file("~/.ssh/id_rsa.pub")
+} 
 ```
+
+### main code
+Making  vpc with public and private subnet. To give internet acces to private subnet ec2 instances used nat-gateway 
+
+```terraform
+variable "environment" {
+  type    = string
+  default = "dev"
+}
+provider "aws" {
+  region = "ap-southeast-1"
+}
+resource "aws_vpc" "main" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+  tags = {
+    Name = "${var.environment}-main-vpc"
+  }
+}
+
+resource "aws_internet_gateway" "main_igw" {
+  vpc_id = aws_vpc.main.id
+  tags = {
+    Name = "${var.environment}-main-igw"
+  }
+}
+
+
+resource "aws_route_table" "public_rt" {
+  vpc_id = aws_vpc.main.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main_igw.id
+  }
+
+  tags = {
+    Name = "${var.environment}-public-rt"
+  }
+}
+
+resource "aws_subnet" "public_subnet" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.1.0/24"
+  availability_zone       = "ap-southeast-1a"
+  map_public_ip_on_launch = true
+  tags = {
+    Name = "${var.environment}-public-subnet"
+  }
+}
+
+resource "aws_route_table_association" "public_rt_subnet_assc" {
+  route_table_id = aws_route_table.public_rt.id
+  subnet_id      = aws_subnet.public_subnet.id
+}
+
+
+resource "aws_eip" "nat_eip" {
+  vpc = true
+
+}
+resource "aws_nat_gateway" "nat-gw" {
+  subnet_id     = aws_subnet.public_subnet.id
+  allocation_id = aws_eip.nat_eip.id
+
+  tags = {
+    Name = "${var.environment}-nat-gw"
+  }
+}
+
+resource "aws_route_table" "private_rt" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.nat-gw.id
+  }
+  tags = {
+    Name = "${var.environment}-private-rt"
+  }
+
+}
+
+
+
+resource "aws_subnet" "private_subnet" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = "ap-southeast-1a"
+
+  tags = {
+    Name = "${var.environment}-private-subnet"
+  }
+}
+resource "aws_route_table_association" "private_rt_subnet_assc" {
+  subnet_id      = aws_subnet.private_subnet.id
+  route_table_id = aws_route_table.private_rt.id
+}
+
+
+
+locals {
+  aws_ami = "ami-047126e50991d067b"
+
+}
+
+
+```
+
 ### bastion setup
  bastion server to manage instances.
 
@@ -97,9 +208,17 @@ locals {
 
 
 ```
+
+
 ### k3s cluster module
- setup cluster using "k3s-cluster" module
+ setup cluster using "k3s-cluster" module.
+ change k3s token deployment.
 ```terraform
+variable "k3s_token" {
+  type    = string
+  default = "e2d2fe05faac243a166d617e9a450ad0"   # demo token ******change in production******
+}
+
 locals {
   k3s_manifest_path = "./config/k3s_manifest/nginx.yaml"
 }
@@ -125,8 +244,8 @@ locals {
 
 ```
 ### nginx load balncer
- load balanding k3s workers nodes request using nginx loadbalancer.
- recive request at port 80 and make request to worker node using defualt round-robin 
+ load balancing k3s workers nodes request using nginx loadbalancer.
+ receive request at port 80 and make request to worker node using default round-robin.
 ```terraform
 locals {
   server_ip  = module.k3s_cluster.server_ip

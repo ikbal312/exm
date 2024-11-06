@@ -1,5 +1,3 @@
-
-
 variable "environment" {
   type    = string
   default = "dev"
@@ -93,12 +91,6 @@ resource "aws_route_table_association" "private_rt_subnet_assc" {
   subnet_id      = aws_subnet.private_subnet.id
   route_table_id = aws_route_table.private_rt.id
 }
-resource "aws_key_pair" "kp" {
-  key_name   = "kp"
-  public_key = file("~/.ssh/id_rsa.pub")
-}
-
-
 locals {
   aws_ami = "ami-047126e50991d067b"
 
